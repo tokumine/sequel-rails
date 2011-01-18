@@ -9,12 +9,13 @@ require 'sequel-rails/railties/benchmarking_mixin'
 module Rails
   module Sequel
 
-    # Get or setup a connection for a given environment
-    def self.connection(environment)
+    def self.connection(environment = nil)
+      environment ||= Rails.env
       @@connections[environment] ||= setup(environment)
     end
 
-    def self.setup(environment)
+    def self.setup(environment = nil)
+      environment ||= Rails.env
       puts "[sequel] Setting up the #{environment.inspect} environment:"
 
       @@connections ||= {}
