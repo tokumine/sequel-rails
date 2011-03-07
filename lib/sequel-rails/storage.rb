@@ -163,6 +163,8 @@ module Rails
             'dropdb',
             '-U',
             username,
+            '-h',
+            host,
             database
           )
         end
