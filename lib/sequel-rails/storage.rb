@@ -1,6 +1,21 @@
 module Rails
   module Sequel
+     @@connections = {}
 
+    # Get or setup a connection for a given environment
+    def self.connection(environment=nil)
+      environment ||= Rails.env
+      @@connections[environment] ||= setup(environment)
+    end
+
+    def self.setup(environment=nil)
+      environment ||= Rails.env
+      puts "[sequel] Setting up the #{environment.inspect} environment:"
+      @@connections[environment] ||= ::Sequel.connect({:logger => configuration.logger}.merge(::Rails::Sequel.configuration.environment_for(environment.to_s)))
+      @@connections[environment]
+    end
+    
+    
     def self.storage
       Storage
     end
@@ -65,13 +80,20 @@ module Rails
       end
 
       def create
-        _create
-        puts "[sequel] Created database '#{database}'"
+        if _create        
+          puts "[sequel] Created database '#{database}'"
+        else
+          puts "[sequel] FAILED to create database '#{database}'"  
+        end  
       end
 
       def drop
-        _drop
-        puts "[sequel] Dropped database '#{database}'"
+        ::Sequel::Model.db.disconnect
+        if _drop          
+          puts "[sequel] Dropped database '#{database}'"
+        else
+          puts "[sequel] FAILED to drop database '#{database}'"  
+        end  
       end
 
       def database
@@ -79,16 +101,25 @@ module Rails
       end
 
       def username
-        @username ||= config['username'] || ''
-      end
-
-      def host
-        @host ||= config['host'] || 'localhost'
+        @username ||= config['username'] || config['user'] || ''
       end
 
       def password
         @password ||= config['password'] || ''
       end
+
+      def host
+        @host ||= config['host'] || ''
+      end
+
+      def port
+        @port ||= config['port'] || ''
+      end
+
+      def owner
+        @owner ||= config['owner'] || ''
+      end
+      
 
       def charset
         @charset ||= config['charset'] || ENV['CHARSET'] || 'utf8'
@@ -146,27 +177,29 @@ module Rails
 
       class Postgres < Storage
         def _create
-          system(
-            'createdb',
-            '-E',
-            charset,
-            '-U',
-            username,
-            '-h',
-            host,
-            database
-          )
+          ENV["PGPASSWORD"] = password unless password.blank?
+          commands = "createdb --encoding=#{charset} "
+          commands << "--username=#{username} " unless username.blank?
+          commands << "--owner=#{owner} "       unless owner.blank?
+          commands << "--port=#{port} "         unless port.blank?
+          commands << "--host=#{host} "         unless host.blank?
+          commands << database
+          res = system(commands)
+          ENV["PGPASSWORD"] = nil
+          res
         end
 
         def _drop
-          system(
-            'dropdb',
-            '-U',
-            username,
-            '-h',
-            host,
-            database
-          )
+          ENV["PGPASSWORD"] = password unless password.blank?
+          commands = "dropdb "
+          commands << "--username=#{username} " unless username.blank?
+          commands << "--owner=#{owner} "       unless owner.blank?
+          commands << "--port=#{port} "         unless port.blank?
+          commands << "--host=#{host} "         unless host.blank?
+          commands << database
+          res = system(commands)
+          ENV["PGPASSWORD"] = nil
+          res
         end
       end
 
